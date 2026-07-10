@@ -1,0 +1,25 @@
+{
+  "name": "booking-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "REST API owning the ride record — the source of truth for ride state.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.5.1",
+    "pino": "^9.3.2",
+    "pino-http": "^10.2.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.3"
+  }
+}
