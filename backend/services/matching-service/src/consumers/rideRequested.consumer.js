@@ -5,11 +5,11 @@ import { RideStatus } from '../../../../shared/types/index.js';
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
 
-async function updateRideStatusInBookingService(rideId, status) {
+async function updateRideStatusInBookingService(rideId, status, driverId) {
   const response = await fetch(`${env.BOOKING_SERVICE_URL}/api/v1/rides/${rideId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, driverId }),
   });
 
   if (!response.ok) {
@@ -51,8 +51,8 @@ export async function onRideRequested(msg, channel) {
       return;
     }
 
+    await updateRideStatusInBookingService(rideId, RideStatus.ACCEPTED, matchedDriverId);
     await markDriverBusy(matchedDriverId);
-    await updateRideStatusInBookingService(rideId, RideStatus.ACCEPTED);
 
     publishRideMatched({
       rideId,
