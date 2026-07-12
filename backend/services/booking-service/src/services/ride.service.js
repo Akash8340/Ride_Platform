@@ -1,7 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import Ride from '../models/ride.model.js';
 import { RideStatus } from '../../../../shared/types/index.js';
-import { publishRideRequested } from './rabbitmq.service.js';
 import logger from '../utils/logger.js';
 
 export async function createRide({ riderId, pickup, drop, idempotencyKey }) {
@@ -15,17 +14,20 @@ export async function createRide({ riderId, pickup, drop, idempotencyKey }) {
       drop,
       idempotencyKey,
       status: RideStatus.REQUESTED,
-    });
-
-    await publishRideRequested({
-      rideId: ride.rideId,
-      riderId: ride.riderId,
-      pickupLatitude: ride.pickup.latitude,
-      pickupLongitude: ride.pickup.longitude,
-      dropLatitude: ride.drop.latitude,
-      dropLongitude: ride.drop.longitude,
-      status: ride.status,
-      timestamp: Date.now(),
+      outbox: {
+        eventType: 'ride.requested',
+        payload: {
+          rideId,
+          riderId,
+          pickupLatitude: pickup.latitude,
+          pickupLongitude: pickup.longitude,
+          dropLatitude: drop.latitude,
+          dropLongitude: drop.longitude,
+          status: RideStatus.REQUESTED,
+          timestamp: Date.now(),
+        },
+        published: false,
+      },
     });
 
     return { ride, isNew: true };
