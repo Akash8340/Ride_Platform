@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 vendor/
+test-scripts/
+
 
 # Environment variables
 .env
@@ -19,6 +21,7 @@ dist/
 build/
 out/
 coverage/
+
 
 # Python
 __pycache__/
@@ -47,6 +50,7 @@ temp/
 # Test reports
 coverage/
 pytest_cache/
+
 
 # Package lock files (optional)
 # package-lock.json
