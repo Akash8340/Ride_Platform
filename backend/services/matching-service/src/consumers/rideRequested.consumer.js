@@ -1,6 +1,10 @@
 import { findNearbyDrivers, markDriverBusy } from '../services/redis.service.js';
 import { acquireDriverLock } from '../services/lock.service.js';
-import { publishRideMatched } from '../services/rabbitmq.service.js';
+import {
+  publishRideMatched,
+  publishRideNoDriversAvailable,
+  retryOrDeadLetter,
+} from '../services/rabbitmq.service.js';
 import { RideStatus } from '../../../../shared/types/index.js';
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
@@ -30,7 +34,9 @@ export async function onRideRequested(msg, channel) {
     const candidates = await findNearbyDrivers(pickupLatitude, pickupLongitude, env.MATCH_RADIUS_METERS);
 
     if (candidates.length === 0) {
-      logger.warn({ rideId }, 'No drivers in radius — dropping for now, Day 7 adds NO_DRIVERS_AVAILABLE handling');
+      logger.warn({ rideId }, 'No drivers in radius');
+      await updateRideStatusInBookingService(rideId, RideStatus.NO_DRIVERS_AVAILABLE);
+      publishRideNoDriversAvailable({ rideId, riderId, timestamp: Date.now() });
       channel.ack(msg);
       return;
     }
@@ -46,7 +52,9 @@ export async function onRideRequested(msg, channel) {
     }
 
     if (!matchedDriverId) {
-      logger.warn({ rideId }, 'All nearby candidates already locked — dropping for now');
+      logger.warn({ rideId }, 'All nearby candidates already locked');
+      await updateRideStatusInBookingService(rideId, RideStatus.NO_DRIVERS_AVAILABLE);
+      publishRideNoDriversAvailable({ rideId, riderId, timestamp: Date.now() });
       channel.ack(msg);
       return;
     }
@@ -63,7 +71,7 @@ export async function onRideRequested(msg, channel) {
 
     channel.ack(msg);
   } catch (err) {
-    logger.error({ err, rideId }, 'Error processing ride.requested — requeueing');
-    channel.nack(msg, false, true);
+    logger.error({ err, rideId }, 'Error processing ride.requested');
+    retryOrDeadLetter(msg, channel);
   }
 }
