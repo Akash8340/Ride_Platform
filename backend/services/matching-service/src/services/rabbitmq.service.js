@@ -1,8 +1,10 @@
 import amqp from 'amqplib';
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
+import { getBackoffDelay } from '../../../../shared/utils/backoff.js';
 
 let channel = null;
+let reconnectAttempt = 0;
 
 const RIDE_REQUESTED_QUEUE = 'matching_service.ride_requested';
 const RIDE_REQUESTED_DLQ = 'matching_service.ride_requested.dlq';
@@ -20,9 +22,6 @@ export async function connectRabbitMQ(onRideRequested) {
     await channel.assertQueue(RIDE_REQUESTED_QUEUE, { durable: true });
     await channel.bindQueue(RIDE_REQUESTED_QUEUE, env.RIDE_EVENTS_EXCHANGE, 'ride.requested');
 
-    // Dead-letter queue — not bound to the exchange. Nothing consumes it
-    // automatically; it exists purely as a holding pen for a human to
-    // inspect messages that failed processing too many times.
     await channel.assertQueue(RIDE_REQUESTED_DLQ, { durable: true });
 
     await channel.prefetch(1);
@@ -35,18 +34,26 @@ export async function connectRabbitMQ(onRideRequested) {
 
     logger.info('RabbitMQ connected, consuming ride.requested');
 
+    // Connected successfully — reset the counter so the NEXT disconnect
+    // starts backing off from 0 again, not from wherever it left off.
+    reconnectAttempt = 0;
+
     connection.on('close', () => {
-      logger.error('RabbitMQ connection closed — retrying in 5s');
+      const delay = getBackoffDelay(reconnectAttempt);
+      logger.error({ delay, attempt: reconnectAttempt }, 'RabbitMQ connection closed — retrying');
       channel = null;
-      setTimeout(() => connectRabbitMQ(onRideRequested), 5000);
+      reconnectAttempt += 1;
+      setTimeout(() => connectRabbitMQ(onRideRequested), delay);
     });
 
     connection.on('error', (err) => {
       logger.error({ err }, 'RabbitMQ connection error');
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to connect to RabbitMQ — retrying in 5s');
-    setTimeout(() => connectRabbitMQ(onRideRequested), 5000);
+    const delay = getBackoffDelay(reconnectAttempt);
+    logger.error({ err, delay, attempt: reconnectAttempt }, 'Failed to connect to RabbitMQ — retrying');
+    reconnectAttempt += 1;
+    setTimeout(() => connectRabbitMQ(onRideRequested), delay);
   }
 }
 

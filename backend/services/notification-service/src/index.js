@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import env from './config/env.js';
 import { connectRabbitMQ } from './services/rabbitmq.service.js';
-import { onRideMatched } from './consumers/rideMatched.consumer.js';
+import { onRideEvent } from './consumers/rideMatched.consumer.js';
 import { registerClient, getConnectedCount } from './sockets/registry.js';
 import logger from './utils/logger.js';
 
@@ -31,7 +31,7 @@ wss.on('connection', (ws) => {
 });
 
 async function start() {
-  await connectRabbitMQ(onRideMatched);
+  await connectRabbitMQ(onRideEvent);
   logger.info(`notification-service listening on ws://localhost:${env.PORT}`);
 }
 

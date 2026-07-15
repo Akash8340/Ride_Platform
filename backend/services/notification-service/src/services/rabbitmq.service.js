@@ -1,10 +1,13 @@
 import amqp from 'amqplib';
 import env from '../config/env.js';
 import logger from '../utils/logger.js';
+import { getBackoffDelay } from '../../../../shared/utils/backoff.js';
 
-const RIDE_MATCHED_QUEUE = 'notification_service.ride_matched';
+const RIDE_EVENTS_QUEUE = 'notification_service.ride_events';
 
-export async function connectRabbitMQ(onRideMatched) {
+let reconnectAttempt = 0;
+
+export async function connectRabbitMQ(onRideEvent) {
   try {
     const connection = await amqp.connect(env.RABBITMQ_URL);
     const channel = await connection.createChannel();
@@ -13,29 +16,36 @@ export async function connectRabbitMQ(onRideMatched) {
       durable: true,
     });
 
-    await channel.assertQueue(RIDE_MATCHED_QUEUE, { durable: true });
-    await channel.bindQueue(RIDE_MATCHED_QUEUE, env.RIDE_EVENTS_EXCHANGE, 'ride.matched');
+    await channel.assertQueue(RIDE_EVENTS_QUEUE, { durable: true });
+    await channel.bindQueue(RIDE_EVENTS_QUEUE, env.RIDE_EVENTS_EXCHANGE, 'ride.matched');
+    await channel.bindQueue(RIDE_EVENTS_QUEUE, env.RIDE_EVENTS_EXCHANGE, 'ride.no_drivers_available');
 
     await channel.prefetch(1);
 
-    channel.consume(RIDE_MATCHED_QUEUE, (msg) => {
+    channel.consume(RIDE_EVENTS_QUEUE, (msg) => {
       if (msg !== null) {
-        onRideMatched(msg, channel);
+        onRideEvent(msg, channel);
       }
     });
 
-    logger.info('RabbitMQ connected, consuming ride.matched');
+    logger.info('RabbitMQ connected, consuming ride.matched + ride.no_drivers_available');
+
+    reconnectAttempt = 0;
 
     connection.on('close', () => {
-      logger.error('RabbitMQ connection closed — retrying in 5s');
-      setTimeout(() => connectRabbitMQ(onRideMatched), 5000);
+      const delay = getBackoffDelay(reconnectAttempt);
+      logger.error({ delay, attempt: reconnectAttempt }, 'RabbitMQ connection closed — retrying');
+      reconnectAttempt += 1;
+      setTimeout(() => connectRabbitMQ(onRideEvent), delay);
     });
 
     connection.on('error', (err) => {
       logger.error({ err }, 'RabbitMQ connection error');
     });
   } catch (err) {
-    logger.error({ err }, 'Failed to connect to RabbitMQ — retrying in 5s');
-    setTimeout(() => connectRabbitMQ(onRideMatched), 5000);
+    const delay = getBackoffDelay(reconnectAttempt);
+    logger.error({ err, delay, attempt: reconnectAttempt }, 'Failed to connect to RabbitMQ — retrying');
+    reconnectAttempt += 1;
+    setTimeout(() => connectRabbitMQ(onRideEvent), delay);
   }
 }
