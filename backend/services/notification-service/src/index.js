@@ -2,6 +2,9 @@ import { WebSocketServer } from 'ws';
 import env from './config/env.js';
 import { connectRabbitMQ } from './services/rabbitmq.service.js';
 import { onRideEvent } from './consumers/rideMatched.consumer.js';
+import { handleRedisMessage } from './consumers/redisEvent.consumer.js';
+import { subscriber } from './services/redis.service.js';
+import { NOTIFICATIONS_CHANNEL } from './services/broadcast.service.js';
 import { registerClient, getConnectedCount } from './sockets/registry.js';
 import { registerMessageSchema } from './validators/register.schema.js';
 import logger from './utils/logger.js';
@@ -41,6 +44,20 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     logger.info('Client disconnected');
   });
+});
+
+subscriber.subscribe(NOTIFICATIONS_CHANNEL, (err) => {
+  if (err) {
+    logger.error({ err }, 'Failed to subscribe to Redis notifications channel');
+  } else {
+    logger.info(`Subscribed to Redis channel: ${NOTIFICATIONS_CHANNEL}`);
+  }
+});
+
+subscriber.on('message', (channel, message) => {
+  if (channel === NOTIFICATIONS_CHANNEL) {
+    handleRedisMessage(message);
+  }
 });
 
 async function start() {

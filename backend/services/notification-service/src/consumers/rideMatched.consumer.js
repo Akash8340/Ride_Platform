@@ -1,4 +1,4 @@
-import { sendToUser } from '../sockets/registry.js';
+import { broadcastRideEvent } from '../services/broadcast.service.js';
 import logger from '../utils/logger.js';
 
 export function onRideEvent(msg, channel) {
@@ -6,30 +6,9 @@ export function onRideEvent(msg, channel) {
     const payload = JSON.parse(msg.content.toString());
     const routingKey = msg.fields.routingKey;
 
-    if (routingKey === 'ride.matched') {
-      const { rideId, riderId, driverId } = payload;
-      logger.info({ rideId, riderId, driverId }, 'Received ride.matched');
+    logger.info({ routingKey, rideId: payload.rideId }, 'Received ride event from RabbitMQ');
 
-      const deliveredToRider = sendToUser(riderId, { type: 'RIDE_MATCHED', rideId, driverId });
-      if (!deliveredToRider) {
-        logger.warn({ riderId, rideId }, 'Rider not connected — notification dropped');
-      }
-
-      const deliveredToDriver = sendToUser(driverId, { type: 'RIDE_MATCHED', rideId, riderId });
-      if (!deliveredToDriver) {
-        logger.warn({ driverId, rideId }, 'Driver not connected — notification dropped');
-      }
-    } else if (routingKey === 'ride.no_drivers_available') {
-      const { rideId, riderId } = payload;
-      logger.info({ rideId, riderId }, 'Received ride.no_drivers_available');
-
-      const delivered = sendToUser(riderId, { type: 'NO_DRIVERS_AVAILABLE', rideId });
-      if (!delivered) {
-        logger.warn({ riderId, rideId }, 'Rider not connected — notification dropped');
-      }
-    } else {
-      logger.warn({ routingKey }, 'Received event with unknown routing key, ignoring');
-    }
+    broadcastRideEvent(routingKey, payload);
 
     channel.ack(msg);
   } catch (err) {
