@@ -16,6 +16,7 @@ const env = {
   REDIS_URL: required('REDIS_URL', 'redis://localhost:6379'),
   RATE_LIMIT_WINDOW_SECONDS: Number(required('RATE_LIMIT_WINDOW_SECONDS', 60)),
   RATE_LIMIT_MAX_REQUESTS: Number(required('RATE_LIMIT_MAX_REQUESTS', 20)),
+  FRONTEND_URL: required('FRONTEND_URL', 'http://localhost:5173'),
   NODE_ENV: required('NODE_ENV', 'development'),
 };
 
