@@ -23,6 +23,15 @@ export async function getRide(rideId) {
   }
 }
 
+export async function updateRideStatus(rideId, status) {
+  try {
+    const response = await api.patch(`/api/v1/rides/${rideId}/status`, { status });
+    return response.data.ride;
+  } catch (err) {
+    throw normalizeError(err, 'Failed to update ride status');
+  }
+}
+
 function normalizeError(err, fallbackMessage) {
   if (err.response) {
     const error = new Error(err.response.data?.error || fallbackMessage);

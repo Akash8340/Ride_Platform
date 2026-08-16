@@ -10,7 +10,7 @@ const STATUS_STYLES = {
   NO_DRIVERS_AVAILABLE: 'bg-rose-950 text-rose-400 border-rose-800',
 };
 
-function RiderPage() {
+export function RiderPage() {
   const [pickup] = useState({ latitude: 23.2599, longitude: 77.4126 });
   const [drop] = useState({ latitude: 23.2156, longitude: 77.4304 });
   const [ride, setRide] = useState(null);
@@ -90,4 +90,4 @@ function RiderPage() {
   );
 }
 
-export default RiderPage;
+
